@@ -120,11 +120,6 @@ Resources:
         # install ssm-agent
         dnf install -y https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm
         systemctl start amazon-ssm-agent
-
-        groupadd -g 999 db2iadm1
-        groupadd -g 998 db2fsdm1
-        groupadd -g 997 dasadm1
-
       Tags:
         - Key: Name
           Value: db2-server

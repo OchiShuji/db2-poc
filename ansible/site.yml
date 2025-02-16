@@ -5,6 +5,12 @@
   become_user: root
 
   tasks:
+    - name: Install Requirements
+      dnf:
+        name: '{{ item.name }}'
+        state: present
+      loop: '{{ dnf_requirements }}'
+
     - name: Create Group
       group:
         name: '{{ item.name }}'
@@ -34,3 +40,6 @@
         dest: /opt
         remote_src: yes
       ignore_errors: '{{ ansible_check_mode }}'
+
+    - name: DB2 Requirements Check
+      command: '/opt/server_dec/db2prereqcheck -i'

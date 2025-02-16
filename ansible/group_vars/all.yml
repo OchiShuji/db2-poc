@@ -1,13 +1,17 @@
 initial_pass: C~nUdD5gB$npw%KS
 
+dnf_requirements:
+  - { name: ksh }
+  - { name: libaio }
+
 group_list:
   - { name: db2iadm1 }
   - { name: db2fsdm1 }
   - { name: dasadm1 }
 
 user_list:
-  - { name: db2inst1, group: db2iadm1, groups: [], password: initial_pass}
-  - { name: db2fenc1, group: db2fsdm1, groups: [], password: initial_pass}
-  - { name: db2inst1, group: dasadm1, groups: [], password: initial_pass}
+  - { name: db2inst1, group: db2iadm1, groups: [], shell: /bin/ksh, password: initial_pass}
+  - { name: db2fenc1, group: db2fsdm1, groups: [], shell: /bin/ksh, password: initial_pass}
+  - { name: db2inst1, group: dasadm1, groups: [], shell: /bin/ksh, password: initial_pass}
 
 archive_name: v12.1.1_linuxx64_server_dec.tar.gz
