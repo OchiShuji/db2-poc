@@ -1,0 +1,132 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: DB2 PoC vpc
+
+Parameters:
+  MyPrefixListId:
+    Type: String
+    Default: pl-0f1765f9b4e2f2171
+  EC2AMI:
+    Type: String
+    Default: ami-0b512018294c0b386
+
+Resources:
+  # VPC
+  DB2PocVpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.10.0.0/16
+      InstanceTenancy: default
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Ref AWS::StackName
+        - Key: service
+          Value: db2-poc
+
+  # Subnet
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: 10.10.1.0/24
+      VpcId: !Ref DB2PocVpc
+      AvailabilityZone: 'ap-northeast-1a'
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-PublicSubnet
+        - Key: service
+          Value: db2-poc
+  
+  # InternetGateway
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-InternetGateway
+        - Key: service
+          Value: db2-poc
+
+  VPCGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref DB2PocVpc
+      InternetGatewayId: !Ref InternetGateway
+          
+  # RouteTable
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref DB2PocVpc
+      Tags:
+        - Key: Name
+          Value: Public Route
+        - Key: service
+          Value: db2-poc
+  
+  PublicRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+    DependsOn: VPCGatewayAttachment
+
+  PublicSubnetAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref PublicRouteTable
+    
+  # SecurityGroup
+  SecurityGroupEC2:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${AWS::StackName}-sg-ec2
+      GroupDescription: Security Group for EC2
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          SourcePrefixListId: !Ref MyPrefixListId
+      VpcId: !Ref DB2PocVpc
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-sg-ec2
+        - Key: service
+          Value: db2-poc
+
+  # EC2
+  EC2KeyPair:
+    Type: AWS::EC2::KeyPair
+    Properties:
+      KeyName: db2-poc-keypair
+      Tags:
+        - Key: service
+          Value: db2-poc
+
+  DB2Server:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref EC2AMI
+      InstanceType: t3.medium
+      SubnetId: !Ref PublicSubnet
+      KeyName: !Ref EC2KeyPair
+      SecurityGroupIds:
+        - !Ref SecurityGroupEC2
+      UserData: !Base64 |
+        #!/bin/bash
+
+        # install ssm-agent
+        dnf install -y https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm
+        systemctl start amazon-ssm-agent
+
+        groupadd -g 999 db2iadm1
+        groupadd -g 998 db2fsdm1
+        groupadd -g 997 dasadm1
+
+      Tags:
+        - Key: Name
+          Value: db2-server
+        - Key: service
+          Value: db2-poc

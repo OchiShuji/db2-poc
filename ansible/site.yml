@@ -1,0 +1,36 @@
+---
+
+- hosts: target
+  become: yes
+  become_user: root
+
+  tasks:
+    - name: Create Group
+      group:
+        name: '{{ item.name }}'
+        state: present
+      loop: '{{ group_list }}'
+
+    - name: Create User
+      user:
+        name: '{{ item.name }}'
+        state: present
+        group: '{{ item.group }}'
+        groups: '{{ item.groups | default([]) }}'
+        shell: '{{ item.shell | default("/bin/bash") }}'
+        password_expire_max: '{{ item.password_expire_max | default(100) }}' 
+        password_expire_min: '{{ item.password_expire_min | default(7) }}' 
+        password: '{{ item.password }}'
+      loop: '{{ user_list }}'
+
+    - name: Copy Tarball
+      copy:
+        src: '{{ archive_name }}'
+        dest: /tmp/{{ archive_name }}
+
+    - name: Extract Tarball
+      unarchive:
+        src: /tmp/{{ archive_name }}
+        dest: /opt
+        remote_src: yes
+      ignore_errors: '{{ ansible_check_mode }}'

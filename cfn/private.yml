@@ -1,0 +1,180 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: DB2 PoC vpc
+
+Parameters:
+  MyPrefixListId:
+    Type: String
+    Default: pl-0f1765f9b4e2f2171
+  EC2AMI:
+    Type: String
+    Default: ami-0b512018294c0b386
+
+Resources:
+  # VPC
+  DB2PocVpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.10.0.0/16
+      InstanceTenancy: default
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Ref AWS::StackName
+        - Key: service
+          Value: db2-poc
+
+  # Subnet
+  PrivateSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: 10.10.1.0/24
+      VpcId: !Ref DB2PocVpc
+      AvailabilityZone: 'ap-northeast-1a'
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-PrivateSubnet
+        - Key: service
+          Value: db2-poc
+          
+  # RouteTable
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref DB2PocVpc
+      Tags:
+        - Key: Name
+          Value: Private Route
+        - Key: service
+          Value: db2-poc
+
+  PrivateSubnetAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet
+      RouteTableId: !Ref PrivateRouteTable
+    
+  # SecurityGroup
+  SecurityGroupEC2:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${AWS::StackName}-sg-ec2
+      GroupDescription: Security Group for EC2
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          SourcePrefixListId: !Ref MyPrefixListId
+      VpcId: !Ref DB2PocVpc
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-sg-ec2
+        - Key: service
+          Value: db2-poc
+
+  SecurityGroupVPCEP:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${AWS::StackName}-sg-vpcep
+      GroupDescription: Security Group for VPCEP
+      VpcId: !Ref DB2PocVpc
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-sg-vpcep
+        - Key: service
+          Value: db2-poc
+  
+  SecuriyGroupIngressEC2:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref SecurityGroupEC2
+      SourceSecurityGroupId: !Ref SecurityGroupVPCEP
+      FromPort: 443
+      ToPort: 443
+  
+  # VPCEP
+  SSMVPCEP:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcEndpointType: Interface
+      SubnetIds: 
+        - !Ref PrivateSubnet
+      VpcId: !Ref DB2PocVpc
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.ssm'
+      PrivateDnsEnabled: true
+      SecurityGroupIds:
+        - !Ref SecurityGroupVPCEP
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-SSMVPCEP
+        - Key: service
+          Value: db2-poc
+
+  EC2MessagesVPCEP:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcEndpointType: Interface
+      SubnetIds: 
+        - !Ref PrivateSubnet
+      VpcId: !Ref DB2PocVpc
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.ec2messages'
+      PrivateDnsEnabled: true
+      SecurityGroupIds:
+        - !Ref SecurityGroupVPCEP
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-EC2MessagesVPCEP
+        - Key: service
+          Value: db2-poc
+
+  S3VPCEP:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcEndpointType: Gateway
+      VpcId: !Ref DB2PocVpc
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
+      RouteTableIds: 
+        - !Ref PrivateRouteTable
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-S3VPCEP
+        - Key: service
+          Value: db2-poc
+
+  LogsVPCEP:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcEndpointType: Interface
+      SubnetIds: 
+        - !Ref PrivateSubnet
+      VpcId: !Ref DB2PocVpc
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.logs'
+      PrivateDnsEnabled: true
+      SecurityGroupIds:
+        - !Ref SecurityGroupVPCEP
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-EC2MessagesVPCEP
+        - Key: service
+          Value: db2-poc
+
+  # EC2
+  DB2Server:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref EC2AMI
+      InstanceType: t3.medium
+      SubnetId: !Ref PrivateSubnet
+      SecurityGroupIds:
+        - !Ref SecurityGroupEC2
+      UserData: !Base64 |
+        #!/bin/bash
+
+        # install ssm-agent
+        dnf install -y https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm
+        systemctl start amazon-ssm-agent
+      Tags:
+        - Key: Name
+          Value: db2-server
+        - Key: service
+          Value: db2-poc
