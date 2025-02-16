@@ -89,6 +89,12 @@ Resources:
           FromPort: 22
           ToPort: 22
           SourcePrefixListId: !Ref MyPrefixListId
+      NetworkInterfaces: 
+        - AssociatePublicIpAddress: "true"
+          DeviceIndex: "0"
+          GroupSet: 
+            - !Ref SecurityGroupEC2
+          SubnetId: !Ref PublicSebnet
       VpcId: !Ref DB2PocVpc
       Tags:
         - Key: Name
@@ -125,3 +131,10 @@ Resources:
           Value: db2-server
         - Key: service
           Value: db2-poc
+
+Output:
+  DB2ServerIP:
+    Value: Fn::GetAtt DB2Server.PublicIp
+    Description: DB2Server IP
+    Export:
+      Name: DB2ServerPublicIP
