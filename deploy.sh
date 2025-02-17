@@ -5,13 +5,13 @@ SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 STACK_NAME="db2-poc-stack"
 
 # Validate CloudFormation template
-if aws cloudformation validate-template --template-body file://"$SCRIPT_DIR/cfn/public.yml" > /dev/null 2>&1; then
+if aws cloudformation validate-template --template-body file://"$SCRIPT_DIR/cfn/public.yml"; then
     echo "Validation of template: successful."
     echo "Do you want to deploy the stack? [yes/no]"
     read -r deploy_stack
 
     if [[ "$deploy_stack" == "yes" ]]; then
-        aws cloudformation create-stack --stack-name "$STACK_NAME" --template-body file://"$SCRIPT_DIR/cfn/public.yml"
+        aws cloudformation deploy --stack-name "$STACK_NAME" --template-file "$SCRIPT_DIR/cfn/public.yml"
         aws cloudformation wait stack-create-complete --stack-name "$STACK_NAME"
     fi
 else
@@ -28,7 +28,7 @@ if [[ -z "$public_ip" ]]; then
 fi
 
 # Replace public_ip placeholder in Ansible configuration
-sed -i "s/#public_ip/$public_ip/" "$SCRIPT_DIR/ansible/group_vars/all.yml"
+echo $public_ip >> "$SCRIPT_DIR/ansible/inventory.ini"
 
 # Run Ansible playbook
 cd "$SCRIPT_DIR/ansible" || exit

@@ -89,12 +89,6 @@ Resources:
           FromPort: 22
           ToPort: 22
           SourcePrefixListId: !Ref MyPrefixListId
-      NetworkInterfaces: 
-        - AssociatePublicIpAddress: "true"
-          DeviceIndex: "0"
-          GroupSet: 
-            - !Ref SecurityGroupEC2
-          SubnetId: !Ref PublicSebnet
       VpcId: !Ref DB2PocVpc
       Tags:
         - Key: Name
@@ -116,10 +110,13 @@ Resources:
     Properties:
       ImageId: !Ref EC2AMI
       InstanceType: t3.medium
-      SubnetId: !Ref PublicSubnet
       KeyName: !Ref EC2KeyPair
-      SecurityGroupIds:
-        - !Ref SecurityGroupEC2
+      NetworkInterfaces: 
+        - AssociatePublicIpAddress: "true"
+          DeviceIndex: "0"
+          GroupSet: 
+            - !Ref SecurityGroupEC2
+          SubnetId: !Ref PublicSubnet
       UserData: !Base64 |
         #!/bin/bash
 
@@ -132,9 +129,9 @@ Resources:
         - Key: service
           Value: db2-poc
 
-Output:
+Outputs:
   DB2ServerIP:
-    Value: Fn::GetAtt DB2Server.PublicIp
+    Value: !GetAtt DB2Server.PublicIp
     Description: DB2Server IP
     Export:
       Name: DB2ServerPublicIP
